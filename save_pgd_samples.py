@@ -82,6 +82,8 @@ def save_adv_samples(data_loader, model, eps=1, step_alpha=1, num_steps=20):
         pred_adv = np.hstack([pred_adv, pred_clamp]) if pred_adv.size else pred_clamp
         pred_nat = np.hstack([pred_nat, pred]) if pred_nat.size else pred
 
+    if os.path.isdir('adv_exp') is False:
+        os.mkdir('adv_exp')
     path = 'adv_exp/pgd_'+str(eps)
     if os.path.isdir(path) is False:
         os.mkdir(path)

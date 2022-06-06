@@ -7,6 +7,7 @@ import utils.global_variables as gv
 sys.path.append('utils')
 from model.CNN import CNN
 from utils.create_data import create_data
+import os
 from utils.filters import filter1, filter2
 '''Data settings'''
 AUGMENTED = True
@@ -43,6 +44,8 @@ def get_features(file_name):
         _, feature_batch = model(data_batch, return_features=True)
         feature_batch = feature_batch.detach().cpu().numpy()
         features = np.vstack([features, feature_batch]) if features.size else feature_batch
+    if os.path.isdir('saved_features/') is False:
+        os.mkdir('saved_features')
     path = 'saved_features/' + file_name + '.npy'
     np.save(path, features)
     print('#### Features Saved to {} ####'.format(path))
