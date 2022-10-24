@@ -15,7 +15,7 @@ BATCH_SIZE = 80
 MAX_SENTENCE_LENGTH = 18000
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
-file_name = 'best_model'
+file_name = 'base_model'
 epsilons = [10, 50, 75, 100, 150]
 stp_alphas = [1, 5, 7.5, 10, 15]
 

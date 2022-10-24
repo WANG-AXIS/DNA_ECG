@@ -24,7 +24,7 @@ device = gv.device
 LEARNING_RATE = 0.001
 NUM_EPOCHS = 200  # number epoch to train
 PADDING = 'two'
-FILE_NAME = 'best_model'
+FILE_NAME = 'base_model'
 
 
 def train_model():
