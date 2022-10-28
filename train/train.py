@@ -1,4 +1,4 @@
-'''This script is for training base model and/or correlated models (regular no decorrelation of prefiltering)'''
+"""This script is for training base model and/or correlated models (regular no decorrelation of prefiltering)"""
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -29,7 +29,7 @@ FILE_NAME = 'base_model'
 
 def train_model():
     print('#### Start Training ####')
-    data = np.load(data_dirc+'raw_data.npy')
+    data = np.load(data_dirc+'raw_data.npy', allow_pickle=True)
     train_data, train_label, val_data, val_label = create_data(data, RAW_LABELS, PERMUTATION, RATIO, PREPROCESS, MAX_SENTENCE_LENGTH, AUGMENTED, PADDING)
     train_dataset = torch.utils.data.TensorDataset(train_data, train_label)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,

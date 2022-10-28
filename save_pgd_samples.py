@@ -63,8 +63,6 @@ def pgd(inputs, lengths, targets, model, criterion, eps=None, step_alpha=None, n
 
 def save_adv_samples(data_loader, model, eps=1, step_alpha=1, num_steps=20):
     model.eval()
-    pred_nat = np.array([])
-    pred_adv = np.array([])
     data_adv = np.array([])
     total = 0.0
 
@@ -79,17 +77,12 @@ def save_adv_samples(data_loader, model, eps=1, step_alpha=1, num_steps=20):
         total += np.sum(pred == targets.numpy())
         print(total/len(val_label))
         data_adv = np.vstack([data_adv, crafted_clamp]) if data_adv.size else crafted_clamp
-        pred_adv = np.hstack([pred_adv, pred_clamp]) if pred_adv.size else pred_clamp
-        pred_nat = np.hstack([pred_nat, pred]) if pred_nat.size else pred
-
     if os.path.isdir('adv_exp') is False:
         os.mkdir('adv_exp')
     path = 'adv_exp/pgd_'+str(eps)
     if os.path.isdir(path) is False:
         os.mkdir(path)
     np.save(path+'/data_adv.npy', data_adv)
-    np.save(path+'/pred_nat.npy', pred_nat)
-    np.save(path+'/pred_adv.npy', pred_adv)
     return None
 
 
