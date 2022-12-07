@@ -9,10 +9,10 @@ Raw data (inputs) are excluded from this repo. Download raw_data.npy from: https
 This work borrows scripts and substantial portions of code from Han, Xintian, et al. (https://github.com/XintianHan/ADV_ECG), specifically for preprocessing and loading data, testing models, and crafting both PGD and smoothed adversarial perturbation (SAP) adversarial attacks. The default model (model/best_model.pth) is also the trained model from Han, et al.
 
 Description of files:  
--train_aux.py: Script used to train auxillary network arms using various mechanisms (feature decorrelation and Fourier partitioning).  
--save_features.py: Script used to save features extracted from training data using a particular network (necessary for decorrelation of successive networks).  
+-train: Contains scripts used to train auxillary networks.  
+-train/save_features.py: Script used to save features extracted from training data using a particular network (necessary for decorrelation of successive networks).  
 -save_pgd_samples.py: Script for creating and saving PGD adversarial samples crafted against a target network.  
 -save_pgd_conv_samples.py: Script for creating and saving SAP adversarial samples crafted against a target network.  
--eval_networks.py: Script that evaluates a trained ensemble on attacks crafted from the two scripts listed above.  
+-evaluate: Directory that contains scripts for evaluating network ensembles once adversarial samples are generated.
 -utils/filters.py: Codes filters used in Fourier partitioning.  
 -utils/get_R.py: Codes functions used in feature decorrelation.  

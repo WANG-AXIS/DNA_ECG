@@ -15,13 +15,14 @@ from utils.create_data import create_data
 from utils.filters import filter1, filter2
 
 
-BATCH_SIZE = 160
+BATCH_SIZE = 500
 MODEL_DIR = '../saved_model/'
 ADV_DIR = '../adv_exp/'
-MODELS = ['base_model', 'dec_model1', 'dec_model2']
-FILTERS = [None, None, None]
-SAVE_DIR = 'dec/'
-ADV_SETS = ['pgd_conv_10', 'pgd_conv_50', 'pgd_conv_75', 'pgd_conv_100', 'pgd_conv_150']
+MODELS = ['base_model', 'fdec_model1', 'fdec_model2']
+FILTERS = [None, filter1, filter2]
+SAVE_DIR = 'fdec/'
+ADV_SETS = ['pgd_conv_10', 'pgd_conv_50', 'pgd_conv_75', 'pgd_conv_100', 'pgd_conv_150',
+            'pgd_10', 'pgd_50', 'pgd_75', 'pgd_100', 'pgd_150']
 ETA = 1e-30 #constant for log stability
 device = gv.device
 
@@ -79,14 +80,14 @@ val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=BATCH_S
 _, I = get_uncertainty(train_data, train_label)
 Imin, Imax = I.min(), I.max()
 """evaluate on natural"""
-#score, I = get_uncertainty(val_data, val_label)
+score, I = get_uncertainty(val_data, val_label)
 #Imin, Imax = I.min(), I.max()
-#I = I-Imin/(Imax-Imin)
-#save_pred(score, I, SAVE_DIR, 'natural')
+I = I-Imin/(Imax-Imin)
+save_pred(score, I, SAVE_DIR, 'natural')
 """evaluate on adversarial"""
-for i in ADV_SETS:
-    adv_data = torch.tensor(np.load(ADV_DIR+i+'/data_adv.npy'))
-    score, I = get_uncertainty(adv_data, val_label)
+#for i in ADV_SETS:
+#    adv_data = torch.tensor(np.load(ADV_DIR+i+'/data_adv.npy'))
+#    score, I = get_uncertainty(adv_data, val_label)
    # Imin, Imax = I.min(), I.max()
-    I = I - Imin / (Imax - Imin)
-    save_pred(score, I, SAVE_DIR, i)
+#    I = I - Imin / (Imax - Imin)
+#    save_pred(score, I, SAVE_DIR, i)
