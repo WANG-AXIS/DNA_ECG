@@ -4,13 +4,17 @@ import torch.nn.functional as F
 
 
 class CNN(nn.Module):
-    def __init__(self, num_classes=4, f_filter=None):
+    """This is the CNN architecture used in Han, et al. Deep
+       learning models for electrocardiograms are susceptible to adversarial attack.
+       Definition has been modified to accommodate prefiltering and decorrelation"""
+    def __init__(self, num_classes=4, input_channels=1, f_filter=None):
         super(CNN, self).__init__()
         if f_filter is None:
             self.filter = None
         else:
             self.filter = nn.parameter.Parameter(torch.tensor(f_filter, dtype=torch.float32), requires_grad=False)
-        self.conv1 = nn.Conv1d(1, 320, kernel_size=24, stride=1, padding=11, bias=True)
+
+        self.conv1 = nn.Conv1d(input_channels, 320, kernel_size=24, stride=1, padding=11, bias=True)
         self.bn1 = nn.BatchNorm1d(320)
         self.maxpool1 = nn.MaxPool1d(kernel_size=2, stride=2, padding=1, dilation=2)
         self.dropout1 = nn.Dropout(0.3)
@@ -44,7 +48,7 @@ class CNN(nn.Module):
         self.dropout10 = nn.Dropout(0.3)
         self.conv11 = nn.Conv1d(128, 128, kernel_size=8, stride=1, padding=28, dilation=8, bias=True)
         self.bn11 = nn.BatchNorm1d(128)
-        self.maxpool11 = nn.MaxPool1d(kernel_size=2, stride=2, padding=1, dilation = 2)
+        self.maxpool11 = nn.MaxPool1d(kernel_size=2, stride=2, padding=1, dilation=2)
         self.dropout11 = nn.Dropout(0.3)
         self.conv12 = nn.Conv1d(128, 64, kernel_size=8, stride=1, padding=28, dilation=8, bias=True)
         self.bn12 = nn.BatchNorm1d(64)
@@ -53,6 +57,8 @@ class CNN(nn.Module):
         self.bn13 = nn.BatchNorm1d(64)
         self.dropout13 = nn.Dropout(0.3)
         self.fc = nn.Linear(64, num_classes)
+        self.features = None
+        self.layer_list = list(range(1, 14))  # List of layer indices for DVERGE
 
     def forward(self, x, return_features=False):
         if self.filter is not None:
@@ -114,9 +120,26 @@ class CNN(nn.Module):
         x = self.bn13(x)
         x = F.relu(x)
         x = self.dropout13(x)
-        self.feat = torch.mean(x, dim = 2)
-        x = self.fc(self.feat)
+        self.features = torch.mean(x, dim=2)
+        x = self.fc(self.features)
         if return_features:
-            return x, self.feat
+            return x, self.features
         else:
             return x
+
+    def get_features(self, x, layer_num):
+        """This method extracts the features distilled from batch x at layer number layer_num,
+        which is used for DVERGE training"""
+        if self.filter is not None:
+            x = torch.fft.fft(x)
+            x = torch.multiply(x, self.filter)
+            x = torch.fft.ifft(x).real
+        for i in range(1, layer_num+1):
+            if i != 1:
+                x = F.relu(x)
+                if i in [2, 7, 12]:
+                    x = getattr(self, f'maxpool{i-1}')(x)
+                x = getattr(self, f'dropout{i-1}')(x)
+            x = getattr(self, f'conv{i}')(x)
+            x = getattr(self, f'bn{i}')(x)
+        return x

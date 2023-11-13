@@ -1,79 +1,112 @@
-"""This script is for training base model and/or correlated models (regular no decorrelation of prefiltering)"""
+"""This script is training an ensemble model"""
 import numpy as np
-import torch
-from torch.utils.data import Dataset
-import torch.nn as nn
 import sys
-import utils.global_variables as gv
-from utils.test_model import cal_F1, test_model
-from model.CNN import CNN
+import yaml
+from pathlib import Path
+from ensemble import Ensemble
+sys.path.append('../')
 from utils.create_data import create_data
-from save_features import get_features
-
-sys.path.append('../utils')
-'''Training settings'''
-AUGMENTED = True
-RATIO = 19
-PREPROCESS = 'zero'
-data_dirc = '../data/'
-RAW_LABELS = np.load(data_dirc+'raw_labels.npy')
-PERMUTATION = np.load(data_dirc+'random_permutation.npy')
-BATCH_SIZE = 64
-MAX_SENTENCE_LENGTH = 18000
-device = gv.device
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 200  # number epoch to train
-PADDING = 'two'
-FILE_NAME = 'base_model'
+from model.CNN import CNN
 
 
-def train_model():
-    print('#### Start Training ####')
-    data = np.load(data_dirc+'raw_data.npy', allow_pickle=True)
-    train_data, train_label, val_data, val_label = create_data(data, RAW_LABELS, PERMUTATION, RATIO, PREPROCESS, MAX_SENTENCE_LENGTH, AUGMENTED, PADDING)
-    train_dataset = torch.utils.data.TensorDataset(train_data, train_label)
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                               batch_size=BATCH_SIZE,
-                                               shuffle=True)
+'''Training settings
+save_dir: directory in which to save trained ensemble
+data_dir: directory location for data
+max_training_minutes: set maximum number of training minutes per model in ensemble.
+If None, then training will run for the full number of epochs.'''
 
-    val_dataset = torch.utils.data.TensorDataset(val_data, val_label)
-    val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
-                                             batch_size=BATCH_SIZE,
-                                             shuffle=False)
+save_dir = 'runs/sample_run'
+data_dir = '../data/data_dir'
+max_training_minutes = None
 
-    model = CNN(num_classes=4)
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-    model = model.to(device)
-    # Criterion and Optimizer
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    best_acc = 0.0
-    for epoch in range(NUM_EPOCHS):
-        train_loss = 0.0
-        for i, (data, labels) in enumerate(train_loader):
-            model.train()
-            data_batch, label_batch = data.to(device),  labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(data_batch)
-            loss = criterion(outputs, label_batch)
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-        # validate
-        val_acc, val_F1 = cal_F1(val_loader, model)
-        if val_acc > best_acc:
-            best_acc = val_acc
-            best_F1 = val_F1
-            torch.save(model.state_dict(), '../saved_model/'+FILE_NAME+'.pth')
-        train_acc = test_model(train_loader, model)
-        train_loss /= len(train_loader.sampler)
-        print('Epoch: [{}/{}], Step: [{}/{}], Val Acc: {}, Val F1: {}, Train Acc: {}, Train Loss: {}'.format(
-            epoch + 1, NUM_EPOCHS, i + 1, len(train_loader), val_acc, val_F1, train_acc, train_loss))
-        sys.stdout.flush()
-    print('#### End Training ####')
-    print('best val acc:', best_acc)
-    print('best F1:', best_F1)
+ensemble_kwargs = {'architecture': CNN,
+                   'num_models': 3,
+                   'input_channels': 1,
+                   'num_classes': 4,
+                   'filters': None,
+                   'save_dir': save_dir}
 
-train_model()
-get_features(FILE_NAME, active_filter=None)
+load_model_kwargs = None #Set to None if training from scratch
+# load_model_kwargs = {'load_dir': 'None',
+#                      'model_nums': None}
+
+data_kwargs = {'ratio': 19,
+               'preprocess': 'zero',
+               'max_length': 18000,
+               'augmented': True,
+               'padding': 'two'}
+
+# training_kwargs = None
+training_kwargs = {'batch_size': 64,
+                   'epochs': 80,
+                   'learning_rate': 0.001,
+                   'optimizer_name': 'Adam',
+                   'loss_fn': 'CrossEntropyLoss',
+                   'device': 'cuda',
+                   'decorrelate_weight': 0.0,
+                   'projection_dim': 32,
+                   'train_model_numbers': None,
+                   'data_parallel': True}
+
+adversarial_training_kwargs = None  # Set to none for no adversarial training
+# adversarial_training_kwargs = {'max_length': 24000,
+#                                'eps': 10,
+#                                'step_alpha': 1./10,
+#                                'num_steps': 20,
+#                                'smooth_attack': False,
+#                                'sizes': None,
+#                                'weights': None}
+
+dverge_kwargs = None  # Set to none for no DVERGE training
+# dverge_kwargs = {'batch_size': 64,
+#                  'epochs': 80,
+#                  'learning_rate': 0.001,
+#                  'optimizer_name': 'Adam',
+#                  'loss_fn': 'CrossEntropyLoss',
+#                  'device': 'cuda',
+#                  'epsilon': 1/40,
+#                  'step_alpha': 1/400,
+#                  'num_steps': 20,
+#                  'data_parallel': True}
+
+
+def main():
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    all_settings = {'data_kwargs': data_kwargs,
+                    'training_kwargs': training_kwargs,
+                    'ensemble_kwargs': ensemble_kwargs,
+                    'load_models_kwargs': load_model_kwargs,
+                    'data_dir': data_dir,
+                    'adversarial_training_kwargs': adversarial_training_kwargs,
+                    'dverge_kwargs': dverge_kwargs,
+                    'max_training_minutes': max_training_minutes}
+    with open(f'{save_dir}/settings.yaml', 'w') as file:
+        yaml.dump(all_settings, file)
+
+    data = np.load(f'{data_dir}/raw_data.npy', allow_pickle=True)
+    raw_labels = np.load(f'{data_dir}/raw_labels.npy')
+    permutation = np.load(f'{data_dir}/random_permutation.npy')
+    train_data, train_labels, validate_data, validate_labels = create_data(data,
+                                                                           raw_labels,
+                                                                           permutation,
+                                                                           **data_kwargs)
+    ensemble = Ensemble(**ensemble_kwargs)
+    if load_model_kwargs is not None:
+        ensemble.load_models(**load_model_kwargs)
+    if dverge_kwargs is not None:
+        ensemble.train_dverge(train_data,
+                              train_labels,
+                              **dverge_kwargs,
+                              max_training_minutes=max_training_minutes)
+    else:
+        ensemble.train(train_data,
+                       train_labels,
+                       validate_data,
+                       validate_labels,
+                       **training_kwargs,
+                       adversarial_training_kwargs=adversarial_training_kwargs,
+                       max_training_minutes=max_training_minutes)
+
+
+if __name__ == "__main__":
+    main()
