@@ -2,7 +2,6 @@ data/
 train/runs/
 __pycache__/
 train/__pycache__/
-results/
 .idea/
 sampling_log/
 train/log/
