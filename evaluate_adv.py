@@ -36,8 +36,11 @@ sigmas = [1.0, 3.0, 5.0, 7.0, 10.0]
 # sizes = [9, 11, 15, 19, 21]
 # sigmas = [5.0, 7.0, 10.0, 13.0, 17.0]
 
+# Other Attack Settings
 num_steps = 20
-smooth_attack = False
+smooth_attack = True
+multimodel_attack = False # True: attack is crafted to attack all models in ensemble. False: Attack only directly
+# targets first model in ensemble
 device_str = 'cuda:0'
 batch_size = 15
 
@@ -74,12 +77,13 @@ def main():
     for epsilon, stp_alpha in zip(epsilons, stp_alphas):
         eps_predictions = np.array([], dtype=np.int32)
         eps_I = np.array([], dtype=np.float32)
+        model_list = ensemble.models if multimodel_attack else [ensemble.models[0]]
         for (inputs, lengths, targets) in val_loader:
             inputs, lengths, targets = inputs.to(device), lengths.to(device), targets.to(device)
 
             if epsilon != 0:
                 inputs = craft_attack(inputs, lengths, targets,
-                                      ensemble.models[0].to(device), max_length,
+                                      model_list, max_length,
                                       epsilon, stp_alpha, num_steps,
                                       smooth_attack, crafting_sizes, crafting_weights)
 
