@@ -1,6 +1,6 @@
 # DNA_ECG
 
-Code for Decorrelative Network Architecture for Robust Electrocardiogram Classification.
+**Code for Decorrelative Network Architecture for Robust Electrocardiogram Classification.**
 
 The data ECG data used in this work is from the 2017 PhysioNet Cardiology Challenge (https://physionet.org/content/challenge-2017/1.0.0/).
 Data from the 2018 China Physiological Signal Challenge are also used (http://2018.icbeb.org/Challenge.html).
