@@ -95,7 +95,7 @@ class Ensemble:
                         inputs, labels, features = inputs.to(device), labels.to(device), features.to(device)
 
                         if adversarial_training_kwargs is not None:
-                            inputs = craft_attack(inputs, None, labels, model, **adversarial_training_kwargs)
+                            inputs = craft_attack(inputs, None, labels, [model], **adversarial_training_kwargs)
                             model.train()
 
                         optimizer.zero_grad()
@@ -201,10 +201,10 @@ class Ensemble:
         for model_id in model_nums:
             model_path = os.path.join(load_dir, f"model_{model_id}_best.pth")
             try:
-                self.models[model_id].load_state_dict(torch.load(model_path))
+                self.models[model_id].load_state_dict(torch.load(model_path, map_location='cpu'))
             except RuntimeError:
                 model = nn.DataParallel(self.models[model_id])
-                model.load_state_dict(torch.load(model_path))
+                model.load_state_dict(torch.load(model_path, map_location='cpu'))
                 self.models[model_id] = model.module
             self.models[model_id].eval()
 
@@ -226,7 +226,7 @@ class Ensemble:
         for model in self.models:
             model.eval()
             model.to(device)
-        x = torch.tensor(x, dtype=torch.float32)
+        x = torch.as_tensor(x, dtype=torch.float32)
         predictions = np.array([], dtype=np.int32)
         I = np.array([], dtype=np.float32)
         with torch.no_grad():
@@ -271,9 +271,33 @@ class Ensemble:
                                                              batch_size=batch_size,
                                                              shuffle=True))
 
-            for batch_idx, (inputs, labels) in enumerate(train_loader):
-                inputs = inputs.to(device)
-                source_inputs, source_labels = next(source_loader)
+            def cycle_iter(loader, batch_size):
+                try:
+                    inputs, labels = next(loader)
+                except StopIteration:
+                    loader = iter(torch.utils.data.DataLoader(dataset=train_dataset,
+                                                              batch_size=batch_size,
+                                                              shuffle=True))
+                    inputs, labels = next(loader)
+
+                if len(labels) < batch_size:
+                    inputs, labels = cycle_iter(loader, batch_size)
+
+                return inputs[:batch_size], labels[:batch_size]
+
+            for batch_idx, (target_inputs, target_labels) in enumerate(train_loader):
+                current_batch_size = len(target_labels)
+                source_inputs, source_labels = cycle_iter(source_loader, current_batch_size)
+
+                # Apply loop to ensure that classes are mismatched between all source and target
+                mismatch_idx = source_labels != target_labels
+                while torch.any(~mismatch_idx):
+                    new_inputs, new_labels = cycle_iter(source_loader, current_batch_size)
+                    source_inputs[~mismatch_idx] = new_inputs[~mismatch_idx]
+                    source_labels[~mismatch_idx] = new_labels[~mismatch_idx]
+                    mismatch_idx = source_labels != target_labels
+
+                target_inputs = target_inputs.to(device)
                 source_inputs, source_labels = source_inputs.to(device), source_labels.to(device)
 
                 feature_layer = random.choice(layer_list)
@@ -285,8 +309,8 @@ class Ensemble:
                     else:
                         forward_func = lambda x: model.get_features(x, feature_layer)
                     with torch.no_grad():
-                        target_features = forward_func(inputs).detach()
-                    distilled_feature = craft_attack(source_inputs, None, target_features, forward_func,
+                        target_features = forward_func(target_inputs).detach()
+                    distilled_feature = craft_attack(source_inputs, None, target_features, [forward_func],
                                                      eps=epsilon, step_alpha=step_alpha, num_steps=num_steps,
                                                      loss_fn=nn.MSELoss(), minimize=True)
                     distilled_features.append(distilled_feature)
